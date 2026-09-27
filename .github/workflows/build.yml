@@ -1,22 +1,22 @@
-name: Build AP
+name: Build APK
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Preparar projeto
+      - name: Criar projeto Android
         run: |
-          mkdir -p app/src/main/java/br/com/oryon/tiktokliveskip
+          mkdir -p app/src/main/java/com/tiktokliveskip
+          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
-      - name: Criar settings.gradle
-        run: |
           cat > settings.gradle <<'EOF'
           pluginManagement {
               repositories {
@@ -27,7 +27,6 @@ jobs:
           }
 
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
                   google()
                   mavenCentral()
@@ -38,29 +37,24 @@ jobs:
           include(":app")
           EOF
 
-      - name: Criar build.gradle
-        run: |
           cat > build.gradle <<'EOF'
           plugins {
               id 'com.android.application' version '8.7.3' apply false
           }
           EOF
 
-      - name: Criar app/build.gradle
-        run: |
-          mkdir -p app
           cat > app/build.gradle <<'EOF'
           plugins {
               id 'com.android.application'
           }
 
           android {
-              namespace 'br.com.oryon.tiktokliveskip'
+              namespace 'com.tiktokliveskip'
               compileSdk 35
 
               defaultConfig {
-                  applicationId 'br.com.oryon.tiktokliveskip'
-                  minSdk 26
+                  applicationId 'com.tiktokliveskip'
+                  minSdk 23
                   targetSdk 35
                   versionCode 1
                   versionName '1.0'
@@ -68,51 +62,140 @@ jobs:
           }
           EOF
 
-      - name: Criar AndroidManifest
-        run: |
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#FF0050</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">TikTok Live Skip</string>
+              <string name="accessibility_service_description">Serviço de acessibilidade do TikTok Live Skip</string>
+          </resources>
+          EOF
+
           cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
               <application
                   android:theme="@style/AppTheme"
-                  android:label="TikTok Live Skip"
-                  android:allowBackup="false">
+                  android:label="@string/app_name"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
 
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
+
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
+
                   </activity>
 
                   <service
                       android:name=".LiveSkipAccessibilityService"
                       android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-                      android:exported="false">
+                      android:exported="true"
+                      android:label="@string/app_name">
+
                       <intent-filter>
-                          <action android:name="android.accessibilityservice.AccessibilityService"/>
+                          <action android:name="android.accessibilityservice.AccessibilityService" />
                       </intent-filter>
 
                       <meta-data
                           android:name="android.accessibilityservice"
-                          android:resource="@xml/accessibility_service_config"/>
+                          android:resource="@xml/accessibility_service_config" />
+
                   </service>
 
               </application>
+
           </manifest>
           EOF
 
-      - name: Criar configuração de acessibilidade
-        run: |
-          mkdir -p app/src/main/res/xml
           cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
-          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged"
-              android:accessibilityFeedbackType="feedback
-          canRetrieveWindowContent="true"
-          notificationTimeout="100"/  
+          <?xml version="1.0" encoding="utf-8"?>
+
+          <accessibility-service
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              android:accessibilityEventTypes="typeAllMask"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:notificationTimeout="100"
+              android:canRetrieveWindowContent="true" />
+          EOF
+
+          cat > app/src/main/java/com/tiktokliveskip/MainActivity.java <<'EOF'
+          package com.tiktokliveskip;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.os.Bundle;
+          import android.provider.Settings;
+          import android.view.Gravity;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+
+          public class MainActivity extends Activity {
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setGravity(Gravity.CENTER);
+
+                  int padding = 48;
+                  layout.setPadding(padding, padding, padding, padding);
+
+                  TextView title = new TextView(this);
+                  title.setText("TikTok Live Skip");
+                  title.setTextSize(24);
+                  title.setGravity(Gravity.CENTER);
+
+                  Button button = new Button(this);
+                  button.setText("Abrir acessibilidade");
+
+                  button.setOnClickListener(v -> {
+                      startActivity(
+                          new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                      );
+                  });
+
+                  layout.addView(title);
+                  layout.addView(button);
+
+                  setContentView(layout);
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/tiktokliveskip/LiveSkipAccessibilityService.java <<'EOF'
+          package com.tiktokliveskip;
+
+          import android.accessibilityservice.AccessibilityService;
+          import android.view.accessibility.AccessibilityEvent;
+
+          public class LiveSkipAccessibilityService extends AccessibilityService {
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {
+              }
+
+              @Override
+              public void onInterrupt() {
+              }
+          }
           EOF
 
       - name: Configurar Java
@@ -122,20 +205,21 @@ jobs:
           java-version: '17'
 
       - name: Configurar Gradle
-      uses: gradle/actions/setup-gradle@v6
-      with:
+        uses: gradle/actions/setup-gradle@v6
+        with:
           gradle-version: '8.9'
 
-    - name: Instalar Android SDK
+      - name: Instalar Android SDK
         run: |
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-    - name: Compilar APK
+      - name: Compilar APK
         run: gradle :app:assembleDebug
 
-    - name: Enviar APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: TikTokLiveSkip-APK
-        path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Enviar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TikTokLiveSkip-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
